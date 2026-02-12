@@ -17,7 +17,7 @@ from database import (
     PasswordResetTokenModel,
     RefreshTokenModel
 )
-from exceptions import BaseSecurityError, TokenExpiredError, InvalidTokenError
+from exceptions.security import TokenExpiredError, InvalidTokenError
 from security.interfaces import JWTAuthManagerInterface
 from schemas import accounts as schemas
 
@@ -220,7 +220,7 @@ async def reset_password_complete(
     return {"message": "Password reset successfully."}
 
 
-@router.post("/login/", response_model=schemas.UserLoginResponseSchema, status_code=status.HTTP_201_CREATED)
+@router.post("/login/", response_model=schemas.UserLoginResponseSchema, status_code=status.HTTP_200_OK)
 async def login(
         login_data: schemas.UserLoginRequestSchema,
         db: AsyncSession = Depends(get_db),

@@ -709,7 +709,7 @@ async def test_login_user_success(client, db_session, jwt_manager, seed_user_gro
         "password": user_payload["password"]
     }
     response = await client.post("/api/v1/accounts/login/", json=login_payload)
-    assert response.status_code == 201, "Expected status code 201 for successful login."
+    assert response.status_code == 200, "Expected status code 200 for successful login."
     response_data = response.json()
     assert "access_token" in response_data, "Access token is missing in the response."
     assert "refresh_token" in response_data, "Refresh token is missing in the response."
@@ -891,7 +891,7 @@ async def test_refresh_access_token_success(client, db_session, jwt_manager, see
         "password": user_payload["password"]
     }
     login_response = await client.post("/api/v1/accounts/login/", json=login_payload)
-    assert login_response.status_code == 201, "Expected status code 201 for successful login."
+    assert login_response.status_code == 200, "Expected status code 200 for successful login."
     login_data = login_response.json()
     refresh_token = login_data["refresh_token"]
 
