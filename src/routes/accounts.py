@@ -42,6 +42,12 @@ async def register(
         group_result = await db.execute(group_stmt)
         group = group_result.scalars().first()
 
+        if not group:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Default user group not found."
+            )
+
         user = UserModel.create(
             email=user_data.email,
             raw_password=user_data.password,
@@ -55,7 +61,7 @@ async def register(
 
         await db.commit()
         await db.refresh(user)
-        return user
+        return {"id": user.id, "email": user.email}
     except HTTPException:
         raise
     except SQLAlchemyError:
@@ -103,13 +109,17 @@ async def activate(
         expires_at = expires_at.replace(tzinfo=timezone.utc)
 
     if expires_at < datetime.now(timezone.utc):
+        delete_stmt = delete(ActivationTokenModel).where(ActivationTokenModel.id == token_record.id)
+        await db.execute(delete_stmt)
+        await db.commit()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired activation token."
         )
 
     user.is_active = True
-    await db.delete(token_record)
+    delete_stmt = delete(ActivationTokenModel).where(ActivationTokenModel.id == token_record.id)
+    await db.execute(delete_stmt)
 
     try:
         await db.commit()
@@ -174,7 +184,8 @@ async def reset_password_complete(
     token_record = user.password_reset_token
     if not token_record or token_record.token != reset_data.token:
         if token_record:
-            await db.delete(token_record)
+            delete_stmt = delete(PasswordResetTokenModel).where(PasswordResetTokenModel.id == token_record.id)
+            await db.execute(delete_stmt)
             await db.commit()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -186,7 +197,8 @@ async def reset_password_complete(
         expires_at = expires_at.replace(tzinfo=timezone.utc)
 
     if expires_at < datetime.now(timezone.utc):
-        await db.delete(token_record)
+        delete_stmt = delete(PasswordResetTokenModel).where(PasswordResetTokenModel.id == token_record.id)
+        await db.execute(delete_stmt)
         await db.commit()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -195,7 +207,8 @@ async def reset_password_complete(
 
     try:
         user.password = reset_data.password
-        await db.delete(token_record)
+        delete_stmt = delete(PasswordResetTokenModel).where(PasswordResetTokenModel.id == token_record.id)
+        await db.execute(delete_stmt)
         await db.commit()
     except SQLAlchemyError:
         await db.rollback()
@@ -278,6 +291,9 @@ async def refresh_token(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token not found.")
 
     user_id = payload.get("user_id")
+    if token_record.user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token not found.")
+
     user_stmt = select(UserModel).where(UserModel.id == user_id)
     user_result = await db.execute(user_stmt)
     user = user_result.scalars().first()
